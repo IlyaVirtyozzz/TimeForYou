@@ -30,10 +30,12 @@ class Menu():
                 self.user.step_room = 0
                 self.db.session.commit()
                 self.res['response']["card"] = info['menu']
-                self.res['response']['text'] = 'lo'
-                self.res['response']['tts'] = 'q'
+                self.res['response']['text'] = 'Меню'
+                self.res['response']['tts'] = 'Меню'
             else:
-                pass
+                self.res['response']["card"] = info['menu']
+                self.res['response']['text'] = 'Меню'
+                self.res['response']['tts'] = 'Меню'
 
     def tree(self):
         if self.timeflow:
@@ -53,15 +55,23 @@ class Menu():
                     self.db.session.commit()
                     if any(word in tokens for word in ['мои', 'действия', 'список']):
                         thingslist = UsersThing(self.res, self.req, self.db, self.user, self.timeflow, False)
-                        self.user.step_room = 1
+                        self.user.step_room = 0
+                        self.user.step_passage = 1
+                        self.db.session.commit()
                         thingslist.start(command, tokens)
                         self.res = thingslist.get_res()
                     elif any(word in tokens for word in ['засечь', 'таймер', 'поставить']):
                         recordtime = RecordTime(self.res, self.req, self.db, self.user, self.timeflow, False)
+                        self.user.step_room = 0
+                        self.user.step_passage = 2
+                        self.db.session.commit()
                         recordtime.start(command, tokens)
                         self.res = recordtime.get_res()
                     elif any(word in tokens for word in ['добавить']):
                         creater = CreateThing(self.res, self.req, self.db, self.user, self.timeflow, False)
+                        self.user.step_room = 0
+                        self.user.step_passage = 3
+                        self.db.session.commit()
                         creater.start(command, tokens)
                         self.res = creater.get_res()
                     else:
@@ -111,7 +121,7 @@ class CreateThing():
             if command.isdigit():
                 self.res['response']['text'] = 'Назови название дейставия'
                 self.res['response']['tts'] = 'Назови название дейставия'
-            elif ThingTime.query.filter_by(username=command).first():
+            elif ThingTime.query.filter_by(name=command).first():
                 self.res['response']['text'] = 'Такое занятие у вас уже есть'
                 self.res['response']['tts'] = 'Такое занятие у вас уже есть'
             else:
@@ -120,8 +130,8 @@ class CreateThing():
                 self.res['response']['tts'] = 'Создала, засечь время?'
                 self.user.step_room = 1
                 self.db.session.commit()
-        if self.user.step_room == 1:
-            if any(word in tokens for word in ['таймер', 'засечь']):
+        elif self.user.step_room == 1:
+            if any(word in tokens for word in ['таймер', 'засечь', 'да']):
                 pass
             elif any(word in tokens for word in ['не', 'нет', 'список']):
                 self.user.step_passage = 0
@@ -174,13 +184,13 @@ class UsersThing():
 
     def start(self, command, tokens):
         things_list = get_things_list(self.req['session']['user_id'])
-        self.res['response']['text'] = ''
-        self.res['response']['tts'] = ''
-        self.res['response']["card"] = info['things_list']
+        self.res['response']['text'] = 'Список'
+        self.res['response']['tts'] = 'Список'
+        self.res['response']["card"] = info['things_list'].copy()
+        self.res['response']["card"]['header']['text'] = self.res['response']['text']
 
         for item in things_list[:4]:
             self.res['response']["card"]["items"].append({
-                "image_id": "",
                 "title": item.name,
                 "button": {
                     "text": item.name,
@@ -189,16 +199,16 @@ class UsersThing():
                     }
                 }
             })
-        self.res['response']["card"]["items"].append({
-            "image_id": "",
-            "title": "Далее",
-            "button": {
-                "text": "Далее",
-                "payload": {
-                    "text": "Далее"
+        if things_list[4:]:
+            self.res['response']["card"]["items"].append({
+                "title": "Далее",
+                "button": {
+                    "text": "Далее",
+                    "payload": {
+                        "text": "Далее"
+                    }
                 }
-            }
-        })
+            })
         self.user.step_room = 1
         self.db.session.commit()
 
@@ -209,13 +219,10 @@ class UsersThing():
                 self.user.step_room += 1
             elif any(word in tokens for word in ['назад']):
                 self.user.step_room -= 1
-
             self.db.session.commit()
-            self.res['response']['text'] = ''
-            self.res['response']['tts'] = ''
-            self.res['response']["card"] = info['things_list']
-            if self.user.step_room == 1:
-                for item in things_list[4:][0 * 3: self.user.step_room * 3]:
+            self.res['response']["card"] = info['things_list'].copy()
+            if self.user.step_room == 0:
+                for item in things_list[:4][0: self.user.step_room * 3]:
                     self.res['response']["card"]["items"].append({
                         "image_id": "",
                         "title": item.name,
@@ -226,6 +233,48 @@ class UsersThing():
                             }
                         }
                     })
+                if things_list[4:]:
+                    self.res['response']["card"]["items"].append({
+                        "title": "Далее",
+                        "button": {
+                            "text": "Далее",
+                            "payload": {
+                                "text": "Далее"
+                            }
+                        }
+                    })
+            elif self.user.step_room == 1:
+                for item in things_list[4:][0: self.user.step_room * 3]:
+                    self.res['response']["card"]["items"].append({
+
+                        "title": item.name,
+                        "button": {
+                            "text": item.name,
+                            "payload": {
+                                "text": item.name
+                            }
+                        }
+                    })
+                if things_list[4:][self.user.step_room * 3:]:
+                    self.res['response']["card"]["items"].append({
+                        "title": "Далее",
+                        "button": {
+                            "text": "Далее",
+                            "payload": {
+                                "text": "Далее"
+                            }
+                        }
+                    })
+                self.res['response']["card"]["items"].append({
+                    "title": "Назад",
+                    "button": {
+                        "text": "Назад",
+                        "payload": {
+                            "text": "Назад"
+                        }
+                    }
+                })
+
             else:
                 for item in things_list[4:][self.user.step_room * 3: self.user.step_room + 1 * 3]:
                     self.res['response']["card"]["items"].append({
@@ -238,26 +287,29 @@ class UsersThing():
                             }
                         }
                     })
-            self.res['response']["card"]["items"].append({
-                "image_id": "",
-                "title": "Назад",
-                "button": {
-                    "text": "Назад",
-                    "payload": {
-                        "text": "Назад"
+                if things_list[4:][self.user.step_room + 1 * 3:]:
+                    self.res['response']["card"]["items"].append({
+
+                        "title": "Далее",
+                        "button": {
+                            "text": "Далее",
+                            "payload": {
+                                "text": "Далее"
+                            }
+                        }
+                    })
+                self.res['response']["card"]["items"].append({
+
+                    "title": "Назад",
+                    "button": {
+                        "text": "Назад",
+                        "payload": {
+                            "text": "Назад"
+                        }
                     }
-                }
-            })
-            self.res['response']["card"]["items"].append({
-                "image_id": "",
-                "title": "Далее",
-                "button": {
-                    "text": "Далее",
-                    "payload": {
-                        "text": "Далее"
-                    }
-                }
-            })
+                })
+            self.res['response']['text'] = "Список"
+
         elif any(word in tokens for word in []):
             pass
         else:

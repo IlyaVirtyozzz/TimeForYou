@@ -25,9 +25,10 @@ class ThingTime(db.Model):
     user_id = db.Column(db.Integer, unique=False, nullable=False)
     name = db.Column(db.String, unique=False, nullable=False)
     time = db.Column(db.Integer, unique=False, nullable=False)
+    last_time = db.Column(db.Integer, unique=False, nullable=False)
 
     def __repr__(self):
-        return "<ThingTime {} {} {} {} >".format(self.id, self.user_id, self.name, self.time)
+        return "<ThingTime {} {} {} {} {} >".format(self.id, self.user_id, self.name, self.time, self.last_time)
 
 
 def get_things_list(user_id):

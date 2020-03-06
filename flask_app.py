@@ -1,4 +1,4 @@
-from constants import logging, request, json, app,db
+from constants import logging, request, json, app, db
 from main import Main
 
 logging.basicConfig(level=logging.INFO, filename='/home/AbilityForAlice2/mysite/app.log',
