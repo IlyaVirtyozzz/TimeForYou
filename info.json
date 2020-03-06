@@ -1,0 +1,58 @@
+{
+  "menu": {
+    "type": "ItemsList",
+    "header": {
+      "text": "{}"
+    },
+    "items": [
+      {
+        "image_id": "1030494/7f818b6889258a59263f",
+        "title": "Засечь",
+        "button": {
+          "text": "Засечь",
+          "payload": {
+            "text": "Засечь"
+          }
+        }
+      },
+      {
+        "image_id": "1656841/eefa52cc6c452acf2b88",
+        "title": "Добавить",
+        "button": {
+          "text": "Добавить",
+          "payload": {
+            "text": "Добавить"
+          }
+        }
+      },
+      {
+        "image_id": "1656841/ae28273912889feeb9fb",
+        "title": "Мои дела",
+        "button": {
+          "text": "Мои дела",
+          "payload": {
+            "text": "Мои дела"
+          }
+        }
+      }
+    ]
+  },
+  "things_list": {
+    "type": "ItemsList",
+    "header": {
+      "text": "{}"
+    },
+    "items": [
+      {
+        "image_id": "1030494/7f818b6889258a59263f",
+        "title": "Засечь",
+        "button": {
+          "text": "Засечь",
+          "payload": {
+            "text": "Засечь"
+          }
+        }
+      }
+    ]
+  }
+}
