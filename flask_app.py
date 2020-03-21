@@ -16,4 +16,11 @@ def main():
     one = Main(response, request.json, db)
     one.start()
     response = one.get_response()
+    if request.json['request']["command"] != "ping":
+        logging.info(
+            str(response['session']["user_id"][:5]) + " : " + str(
+                request.json['request']["command"]) + "|{}|".
+            format("new" if request.json['session']['new'] else "old") +
+            str(response['response']['text']))
+
     return json.dumps(response)
