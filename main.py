@@ -1,6 +1,6 @@
 from rooms import UsersThing, Menu, CreateThing
 from database import User, TimeFlow, ThingTime, add_new_user
-from constants import sessionSettings, logging
+from constants import sessionSettings
 
 
 class Main():
@@ -15,11 +15,7 @@ class Main():
         else:
             self.sessionSettings = sessionSettings
             self.sessionSettings[self.user_id] = {"buttons": [], "text": '', "tts": ''}
-        self.markup = self.req["request"].get("markup")
-        if self.markup:
-            self.dangerous = self.markup.get("dangerous_context")
-        else:
-            self.dangerous = False
+
         self.res['response']['buttons'] = []
         self.res['response']['text'] = ''
         self.res['response']['tts'] = ''
@@ -34,7 +30,6 @@ class Main():
         return timeflow
 
     def create_user(self):
-        logging.info(sessionSettings)
         add_new_user(self.user_id)
         user = self.db.session.query(User).filter_by(user_id=self.user_id).first()
 
@@ -42,19 +37,20 @@ class Main():
 
     def start(self):
         user = self.get_user()
-
+        new_user = False
         if not user:
             user = self.create_user()
+            new_user = True
         timeflow = self.get_timeflow(user)
         if self.req['session']['new']:
-
-            menu = Menu(self.res, self.req, self.db, user, timeflow, True)
+            menu = Menu(self.res, self.req, self.db, user, timeflow, True, new_user, user.help_actions)
             menu.start()
             self.res = menu.get_res()
         else:
-            menu = Menu(self.res, self.req, self.db, user, timeflow, False)
+            menu = Menu(self.res, self.req, self.db, user, timeflow, False, new_user, user.help_actions)
             menu.tree()
             self.res = menu.get_res()
+
         self.sessionSettings[self.user_id]["buttons"] = self.res['response']['buttons']
         self.sessionSettings[self.user_id]["text"] = self.res['response']['text']
         self.sessionSettings[self.user_id]["tts"] = self.res['response']['tts']
