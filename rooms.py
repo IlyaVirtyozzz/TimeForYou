@@ -46,16 +46,22 @@ class Menu():
             times = time_change(time.time() - self.timeflow.time_start)
             thing = ThingTime.query.filter_by(id=self.timeflow.thing_id).first()
             if (time.time() - self.timeflow.time_start) > 72000:
+                change_r_p(self.user, room=0, passage=0)
                 self.res['response']["card"] = DIALOGS_CONTENT['cards']['menu']
                 self.res['response']["card"]['header']['text'] = self.res['response']['text'] = \
                     DIALOGS_CONTENT["dialogs"]["timeflow"]["20"][0]
                 self.res['response']['tts'] = \
                     DIALOGS_CONTENT["dialogs"]["timeflow"]["20"][1]
+                if self.actions_flag:
+                    action = random.choice(DIALOGS_CONTENT["dialogs"]["timeflow"]["stop_actions"])
+                    self.res['response']['text'] += action[0]
+                    self.res['response']['tts'] += action[1]
 
                 self.res['response']['buttons'] = [BUTTONS["help"], BUTTONS["can"]]
                 self.db.session.delete(self.timeflow)
             else:
-                if time.time() - self.timeflow.time_start != 0:
+                if not (time.time() - self.timeflow.time_start) < 1:
+
                     if self.new:
                         self.res['response']['text'] = \
                             DIALOGS_CONTENT["dialogs"]["timeflow"]["start"]["new_session"][0].format(
@@ -64,6 +70,7 @@ class Menu():
                         self.res['response']['tts'] = \
                             DIALOGS_CONTENT["dialogs"]["timeflow"]["start"]["new_session"][1].format(thing.name,
                                                                                                      tts_change(*times))
+
                     else:
                         self.res['response']['text'] = \
                             DIALOGS_CONTENT["dialogs"]["timeflow"]["start"]["old_session"][0].format(
@@ -78,6 +85,10 @@ class Menu():
                             thing.name.capitalize(), start_word[0])
                     self.res['response']['tts'] = \
                         DIALOGS_CONTENT["dialogs"]["timeflow"]["start"]["start"][1].format(thing.name, start_word[1])
+                if self.actions_flag:
+                    action = random.choice(DIALOGS_CONTENT["dialogs"]["timeflow"]["start"]["start_actions"])
+                    self.res['response']['text'] += action[0]
+                    self.res['response']['tts'] += action[1]
                 self.res['response']['buttons'] = [BUTTONS["update"], BUTTONS["stop"]]
 
         else:
@@ -125,9 +136,15 @@ class Menu():
                 self.res['response']["card"] = DIALOGS_CONTENT['cards']['menu']
                 self.res['response']['buttons'] = [BUTTONS["help"], BUTTONS["can"]]
                 if things_list:
-                    action = random.choice(DIALOGS_CONTENT["dialogs"]["menu"]["start"]["old_session"]["true_actions"])
-                    self.res['response']["card"]['header']['text'] = self.res['response']['text'] = action[0]
-                    self.res['response']['tts'] = action[1]
+                    if self.actions_flag:
+                        action = random.choice(
+                            DIALOGS_CONTENT["dialogs"]["menu"]["start"]["old_session"]["true_actions"])
+                        self.res['response']["card"]['header']['text'] = self.res['response']['text'] = action[0]
+                        self.res['response']['tts'] = action[1]
+                    else:
+                        self.res['response']["card"]['header']['text'] = " "
+                        self.res['response']['text'] = "Засечь время. Добавить дело. Мои дела."
+                        self.res['response']['tts'] = "Засечь время. sil <[200]> Добавить дело. sil <[200]> Мои дела."
                 else:
                     self.res['response']["card"]['header']['text'] = self.res['response']['text'] = \
                         DIALOGS_CONTENT["dialogs"]["menu"]["start"]["old_session"]["empty_list"][0]
@@ -200,12 +217,16 @@ class Menu():
 
                 if any(word in tokens for word in START_TIME) and search_thing(command, things_list):
                     thing = search_thing(command, things_list)
-                    change_r_p(self.user, self.db, passage=-1)
                     self.user.thing_id = thing.id
-                    self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["menu"]["start_timer"][0].format(
-                        thing.name)
-                    self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["menu"]["start_timer"][0].format(
-                        thing.name)
+                    add_thing_flow(self.user.id, thing.id)
+                    refresh_last_time(thing, datetime.datetime.today())
+                    self.go_menu()
+                elif any(word in tokens for word in MENU):
+                    self.go_menu()
+                elif any(word in tokens for word in MANUAL):
+                    self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]['manual'][0]
+                    self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]['manual'][1]
+                    self.res['response']['buttons'] = sessionSettings[self.req['session']['user_id']]["buttons"]
                 elif any(word in tokens for word in ON) and any(word in tokens for word in HINT):
                     self.user.help_actions = True
                     self.res['response']['text'] = "Подсказки включены! \n" + \
@@ -457,6 +478,10 @@ class CreateThing():
                 menu = Menu(self.res, self.req, self.db, self.user, self.timeflow, False, False, self.actions_flag)
                 menu.start()
                 self.res = menu.get_res()
+            elif any(word in tokens for word in HELP):
+                self.res['response']['buttons'] = [BUTTONS["cancl"], BUTTONS["help"]]
+                self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["create_thing"]["3"]["help"][0]
+                self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["create_thing"]["3"]["help"][1]
             elif any(word in tokens for word in THING_LIST):
                 str_things_list = RecordTime.get_str_things_list(things_list, 0, 15, 0)
                 self.res['response']['text'] = str_things_list
@@ -464,7 +489,7 @@ class CreateThing():
                 self.res['response']['buttons'] = [BUTTONS["cancl"], BUTTONS["help"]]
             elif any(word in command.lower().strip() for word in [x.name.lower() for x in things_list]):
                 thing = RecordTime.search_thing(command, things_list)
-                change_r_p(self.user, room=0, passage=0)
+                change_r_p(self.user, room=0)
                 self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["create_thing"]["3"]["after_delete_thing"][
                     0].format(thing.name.capitalize())
                 self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["create_thing"]["3"]["after_delete_thing"][
@@ -472,9 +497,9 @@ class CreateThing():
                 self.db.session.delete(thing)
                 self.res['response']['buttons'] = [BUTTONS["cancl"], BUTTONS["help"]]
             else:
+                self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["create_thing"]["3"]["else"][0]
+                self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["create_thing"]["3"]["else"][1]
                 self.res['response']['buttons'] = [BUTTONS["cancl"], BUTTONS["help"]]
-                self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["create_thing"]["3"]["help"][0]
-                self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["create_thing"]["3"]["help"][1]
 
     def go_menu(self):
         self.timeflow = get_thing_flow(self.db, self.user.id)
@@ -526,7 +551,7 @@ class RecordTime():
 
     def tree(self, command, tokens):
         things_list = get_things_list(self.req['session']['user_id'])
-        if any(word in tokens for word in CANCEL_LAST_TIME):
+        if any(word in tokens for word in HELP):
             self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["timer"]["help"][0]
             self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["timer"]["help"][1]
             self.res['response']['buttons'] = [BUTTONS["menu"], BUTTONS["help"]]
@@ -552,9 +577,9 @@ class RecordTime():
             refresh_last_time(thing, datetime.datetime.today())
             self.go_menu()
         else:
-            self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["timer"]["help"][0]
-            self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["timer"]["help"][1]
-            self.res['response']['buttons'] = [BUTTONS["menu"], BUTTONS["help"]]
+            self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["timer"]["else"][0]
+            self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["timer"]["else"][1]
+            self.res['response']['buttons'] = [BUTTONS["catalog"], BUTTONS["menu"], BUTTONS["help"]]
 
     @staticmethod
     def search_thing(command, things_list):
@@ -591,12 +616,15 @@ class UsersThing():
     def start(self, command, tokens):
         things_list = get_things_list(self.req['session']['user_id'])
         self.res['response']['buttons'] = []
+
         if self.screen:
             self.res['response']["card"] = copy.deepcopy(DIALOGS_CONTENT['cards']['things_list'])
             self.res['response']["card"]['header']['text'] = self.res['response']['text']
             for item in things_list[:5]:
+                times_all = time_change(item.time)
                 self.res['response']["card"]["items"].append({
                     "title": "• " + item.name.capitalize(),
+                    "description": "{}:{}:{}".format(*times_all),
                     "button": {
                         "text": item.name.capitalize(),
                         "payload": {
@@ -617,7 +645,7 @@ class UsersThing():
             else:
                 self.res['response']['buttons'].append(BUTTONS["menu"])
         else:
-            if len(self.res['response']["card"]["items"]) == 0:
+            if len(things_list) == 0:
                 self.res['response']['buttons'].append(BUTTONS["add"])
                 change_r_p(self.user, room=0, passage=0)
                 self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["usersthing"]["zero"][0]
@@ -676,6 +704,7 @@ class UsersThing():
                 change_r_p(self.user, room=0, passage=1)
                 self.start(command, tokens)
             elif any(word in tokens for word in NO):
+                self.res['response']["card"] = copy.deepcopy(DIALOGS_CONTENT['cards']['things_list'])
                 self.get_thing_menu(thing)
             else:
                 self.res['response']['buttons'] = [BUTTONS["yes"], BUTTONS["no"]]
@@ -701,6 +730,10 @@ class UsersThing():
                 else:
                     self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["usersthing"]["-1"]["unsuc_return"][0]
                     self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["usersthing"]["-1"]["unsuc_return"][1]
+                if self.actions_flag:
+                    action = random.choice(DIALOGS_CONTENT["dialogs"]["usersthing"]["-1"]["actions"])
+                    self.res['response']['text'] += action[0]
+                    self.res['response']['tts'] += "sil <[400]>" + action[1]
                 self.res['response']['buttons'] = [BUTTONS["start"]]
                 if thing.res_last_time == 1:
                     self.res['response']['buttons'].append(BUTTONS["cancel"])
@@ -724,6 +757,10 @@ class UsersThing():
                     thing.res_last_time = 2
                     self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["usersthing"]["-1"]["suc_cancel"][0]
                     self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["usersthing"]["-1"]["suc_cancel"][1]
+                if self.actions_flag:
+                    action = random.choice(DIALOGS_CONTENT["dialogs"]["usersthing"]["-1"]["actions"])
+                    self.res['response']['text'] += action[0]
+                    self.res['response']['tts'] += "sil <[400]>" + action[1]
                 self.res['response']['buttons'] = [BUTTONS["start"]]
                 if thing.res_last_time == 1:
                     self.res['response']['buttons'].append(BUTTONS["cancel"])
@@ -736,9 +773,9 @@ class UsersThing():
                 self.res['response']['buttons'].append(BUTTONS["menu"])
                 self.res['response']['buttons'].append(BUTTONS["help"])
             elif any(word in tokens for word in TIME):
+                self.res['response']["card"] = copy.deepcopy(DIALOGS_CONTENT['cards']['things_list'])
                 self.get_thing_menu(thing)
             elif any(word in tokens for word in THING_LIST):
-                self.res['response']["card"] = copy.deepcopy(DIALOGS_CONTENT['cards']['things_list'])
                 change_r_p(self.user, room=0, passage=1)
                 self.start(command, tokens)
             elif any(word in tokens for word in DELETE):
@@ -770,12 +807,14 @@ class UsersThing():
             elif any(word in tokens for word in THING_LIST):
                 things_list = get_things_list(self.req['session']['user_id'])
                 if self.screen:
-                    self.res['response']['buttons'] = []
                     self.res['response']["card"] = copy.deepcopy(DIALOGS_CONTENT['cards']['things_list'])
+                    self.res['response']['buttons'] = []
                     self.res['response']["card"]['header']['text'] = self.res['response']['text']
                     for item in things_list[self.user.step_room * 5: (self.user.step_room + 1) * 5]:
+                        times_all = time_change(item.time)
                         self.res['response']["card"]["items"].append({
                             "title": "• " + item.name.capitalize(),
+                            "description": "{}:{}:{}".format(*times_all),
                             "button": {
                                 "text": item.name.capitalize(),
                                 "payload": {
@@ -796,12 +835,19 @@ class UsersThing():
                     else:
                         self.res['response']['buttons'].append(BUTTONS["menu"])
                 else:
-                    str_things_list = RecordTime.get_str_things_list(things_list, 0, 15, 0)
-                    self.res['response']['buttons'] = [BUTTONS["help"]]
-                    self.res['response']['text'] = str_things_list
-                    self.res['response']['tts'] = str_things_list.replace("\n", "sil <[300]> ")
-                    self.res['response']['buttons'].append(BUTTONS["catalog"])
-                    self.res['response']['buttons'].append(BUTTONS["menu"])
+                    del self.res['response']["card"]
+                    if len(things_list) == 0:
+                        self.res['response']['buttons'].append(BUTTONS["add"])
+                        change_r_p(self.user, room=0, passage=0)
+                        self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["usersthing"]["zero"][0]
+                        self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["usersthing"]["zero"][1]
+                    else:
+                        str_things_list = RecordTime.get_str_things_list(things_list, 0, 15, 0)
+                        self.res['response']['buttons'].append(BUTTONS["help"])
+                        self.res['response']['text'] = str_things_list
+                        self.res['response']['tts'] = str_things_list.replace("\n", "sil <[300]> ")
+                        self.res['response']['buttons'].append(BUTTONS["catalog"])
+                        self.res['response']['buttons'].append(BUTTONS["menu"])
             elif any(word in tokens for word in NEXT) or any(word in tokens for word in BACK):
                 if any(word in tokens for word in NEXT):
                     if len(things_list) > (self.user.step_room + 1) * 5:
@@ -826,8 +872,10 @@ class UsersThing():
                 if self.user.step_room == 0:
                     if self.screen:
                         for item in things_list[:5]:
+                            times_all = time_change(item.time)
                             self.res['response']["card"]["items"].append({
                                 "title": "• " + item.name.capitalize(),
+                                "description": "{}:{}:{}".format(*times_all),
                                 "button": {
                                     "text": item.name.capitalize(),
                                     "payload": {
@@ -850,8 +898,10 @@ class UsersThing():
                 else:
                     if self.screen:
                         for item in things_list[self.user.step_room * 5: (self.user.step_room + 1) * 5]:
+                            times_all = time_change(item.time)
                             self.res['response']["card"]["items"].append({
                                 "title": "• " + item.name.capitalize(),
+                                "description": "{}:{}:{}".format(*times_all),
                                 "button": {
                                     "text": item.name.capitalize(),
                                     "payload": {
@@ -881,7 +931,7 @@ class UsersThing():
                 del self.res['response']["card"]
                 self.res['response']['text'] = DIALOGS_CONTENT["dialogs"]["usersthing"]["list"]["help"][0]
                 self.res['response']['tts'] = DIALOGS_CONTENT["dialogs"]["usersthing"]["list"]["help"][1]
-                self.res['response']['buttons'] = sessionSettings[self.user.user_id]['buttons']
+                self.res['response']['buttons'] = [BUTTONS["catalog"], BUTTONS["help"], BUTTONS["menu"]]
 
     def go_menu(self):
         self.timeflow = get_thing_flow(self.db, self.user.id)
